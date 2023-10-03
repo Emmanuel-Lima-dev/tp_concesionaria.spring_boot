@@ -7,27 +7,28 @@ import com.concesionaria.demo.entity.Vehiculo;
 import com.concesionaria.demo.repository.IVehiculoRepository;
 import com.concesionaria.demo.repository.VehiculoRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.stereotype.Service;
 
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Collection;
+import java.time.LocalDate;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Service
 public class VehiculoServiceImp implements IVehiculoService{
 
     private IVehiculoRepository repository;
+    private ObjectMapper mapper;
 
     public VehiculoServiceImp (VehiculoRepository repository){
         this.repository = repository;
+        this.mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule());
     }
 
-    ObjectMapper mapper = new ObjectMapper();
+
 
     @Override
     public ResponseDto addVehiculo(VehiculoDto vehiculo) {
@@ -58,34 +59,35 @@ public class VehiculoServiceImp implements IVehiculoService{
         //variables a parsear
         String fechaInicioStr = since;
         String fechaFinalStr = to;
-        Date fechaInicio = null;
-        Date fechaFin = null;
+        LocalDate fechaInicio = null;
+        LocalDate fechaFin = null;
 
         //parseo a fechas de tipo Date
         try {
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
 
-            fechaInicio = dateFormat.parse(fechaInicioStr);
-            fechaFin = dateFormat.parse(fechaFinalStr);
 
-        }catch (ParseException e){
+            fechaInicio = LocalDate.parse(fechaInicioStr);
+            fechaFin = LocalDate.parse(fechaFinalStr);
+
+        }catch (NumberFormatException e){
             e.printStackTrace();
         }
 
         //validacion de variables de fechas y conversión de datos
         if (fechaInicio != null && fechaFin != null) {
             //convertimos a variables de tipo final para usar en filter
-            final Date fechaInicioFinal = fechaInicio;
-            final Date fechaFinFinal = fechaFin;
             //obtener lista de vehiculos de la interfaz repository
+            LocalDate finalFechaInicio = fechaInicio;
+            LocalDate finalFechaFin = fechaFin;
             return repository.findAll().stream()
                     //conversión a dto y retorno de lista filtrada
                     .map(vehiculo -> mapper.convertValue(vehiculo, VehiculoDto.class))
                     .filter(vehiculo -> {
-                        final Date manufacturingDate = vehiculo.getManufacturingDate();
+                        final LocalDate manufacturingDate = vehiculo.getManufacturingDate();
                         return manufacturingDate != null &&
-                                manufacturingDate.after(fechaInicioFinal) &&
-                                manufacturingDate.before(fechaFinFinal);
+                                manufacturingDate.isAfter(finalFechaInicio) &&
+                                manufacturingDate.isBefore(finalFechaFin);
                     })
                     .collect(Collectors.toList());
         }
@@ -123,10 +125,10 @@ public class VehiculoServiceImp implements IVehiculoService{
             return repository.findAll().stream()
                     .map(vehiculo -> mapper.convertValue(vehiculo, VehiculoDto.class))
                     .filter(vehiculo -> {
-                        final Double precioVehiculo = ((VehiculoDto) vehiculo).getPrice();
+                        Double precioVehiculo = vehiculo.getPrice();
                         return precioVehiculo != null &&
-                                precioVehiculo <= precioBaseFinal &&
-                                precioVehiculo >= precioFinalFinal;
+                                precioVehiculo >= precioBaseFinal &&
+                                precioVehiculo <= precioFinalFinal;
                     })
                     .collect(Collectors.toList());
         }
